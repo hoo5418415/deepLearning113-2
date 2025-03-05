@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reinforcement Learning Gridworld</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    td {
+      width: 50px;
+      height: 50px;
+      text-align: center;
+      vertical-align: middle;
+      border: 1px solid #000;
+      cursor: pointer;
+    }
+    /* Color coding for the different cell types */
+    .start { background-color: green; }
+    .goal  { background-color: red; }
+    .dead  { background-color: blue; }
+    .obstacle { background-color: gray; }
+  </style>
+</head>
+<body>
+  <h1>Reinforcement Learning Gridworld</h1>
+  
+  <!-- Form for grid dimension -->
+  <form method="post" action="/">
+    <label for="grid_size">Enter grid dimension (3-9):</label>
+    <input type="number" id="grid_size" name="grid_size" min="3" max="9" required>
+    <input type="submit" value="Generate Grid">
+  </form>
+  
+  {% if grid %}
+  <h2>Grid ({{ grid.n }} × {{ grid.n }})</h2>
+  <table id="grid">
+    {% for i in range(grid.n) %}
+      <tr>
+      {% for j in range(grid.n) %}
+         {% set cell = (i, j) %}
+         {% if cell == grid.start %}
+           <td id="cell-{{ i }}-{{ j }}" class="start" data-row="{{ i }}" data-col="{{ j }}"></td>
+         {% elif cell == grid.goal %}
+           <td id="cell-{{ i }}-{{ j }}" class="goal" data-row="{{ i }}" data-col="{{ j }}"></td>
+         {% elif cell == grid.dead %}
+           <td id="cell-{{ i }}-{{ j }}" class="dead" data-row="{{ i }}" data-col="{{ j }}"></td>
+         {% elif cell in grid.obstacles %}
+           <td id="cell-{{ i }}-{{ j }}" class="obstacle" data-row="{{ i }}" data-col="{{ j }}"></td>
+         {% else %}
+           <td id="cell-{{ i }}-{{ j }}" data-row="{{ i }}" data-col="{{ j }}"></td>
+         {% endif %}
+      {% endfor %}
+      </tr>
+    {% endfor %}
+  </table>
+  
+  <script>
+    // Add event listeners to allow user to update the starting cell dynamically.
+    document.querySelectorAll("#grid td").forEach(function(cell) {
+      cell.addEventListener("click", function() {
+        // Do not allow changing cells that are goal, dead, or obstacles.
+        if (cell.classList.contains("goal") || cell.classList.contains("dead") || cell.classList.contains("obstacle")) {
+          return;
+        }
+        // Find and reset the current starting cell.
+        var currentStart = document.querySelector("#grid td.start");
+        if (currentStart) {
+          currentStart.classList.remove("start");
+          currentStart.style.backgroundColor = "";
+        }
+        // Set the clicked cell as the new starting cell.
+        cell.classList.add("start");
+        cell.style.backgroundColor = "green";
+      });
+    });
+  </script>
+  {% endif %}
+</body>
+</html>
