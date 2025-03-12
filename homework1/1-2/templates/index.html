@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reinforcement Learning Gridworld</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    td {
+      width: 50px;
+      height: 50px;
+      text-align: center;
+      vertical-align: middle;
+      border: 1px solid #000;
+    }
+    /* Define cell colors */
+    .start { background-color: green; }
+    .goal  { background-color: red; }
+    .dead  { background-color: blue; }
+    .obstacle { background-color: gray; }
+  </style>
+</head>
+<body>
+  <h1>Reinforcement Learning Gridworld</h1>
+  
+  <!-- Form to generate grid -->
+  <form method="post" action="/">
+    <label for="grid_size">Enter grid size (5-9):</label>
+    <input type="number" id="grid_size" name="grid_size" min="5" max="9" required>
+    <input type="submit" value="Generate Grid">
+  </form>
+  
+  {% if grid %}
+    <h2>Generated Grid ({{ grid.n }} × {{ grid.n }})</h2>
+    <table>
+      {% for i in range(grid.n) %}
+      <tr>
+        {% for j in range(grid.n) %}
+          {% set cell = (i, j) %}
+          {% if cell == grid.start %}
+            <td class="start"></td>
+          {% elif cell == grid.goal %}
+            <td class="goal"></td>
+          {% elif cell == grid.dead %}
+            <td class="dead"></td>
+          {% elif cell in grid.obstacles %}
+            <td class="obstacle"></td>
+          {% else %}
+            <td></td>
+          {% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+    <!-- Button to compute value function & show results -->
+    <form method="post" action="/solve">
+      <button type="submit">Show Results</button>
+    </form>
+  {% endif %}
+</body>
+</html>
