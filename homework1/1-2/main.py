@@ -1,5 +1,4 @@
 import random
-import tkinter as tk
 from flask import Flask, render_template, request, session, redirect, url_for
 
 app = Flask(__name__)
@@ -20,7 +19,8 @@ def index():
         except ValueError:
             n = 5
 
-        # Generate grid configuration
+        # Generate grid configuration:
+        # Fixed start at (0, 0)
         start = (0, 0)
         positions = [(i, j) for i in range(n) for j in range(n) if (i, j) != start]
 
@@ -30,11 +30,11 @@ def index():
         dead = random.choice(positions)
         positions.remove(dead)
 
-        # Randomly select n-2 obstacles from remaining positions
+        # Randomly select n-2 obstacles from the remaining positions
         obstacle_count = n - 2
         obstacles = random.sample(positions, obstacle_count) if len(positions) >= obstacle_count else []
 
-        # Save grid data in session
+        # Save grid data in session for later use
         session["grid_data"] = {
             "n": n,
             "start": start,
@@ -42,22 +42,23 @@ def index():
             "dead": dead,
             "obstacles": obstacles
         }
-        # Render grid (without computing value function yet)
+        # Render grid page (results not yet computed)
         return render_template("index.html", grid=session["grid_data"])
     
-    # GET: only show form (no grid)
+    # GET: Only display the form (no grid yet)
     return render_template("index.html", grid=None)
 
 
 ############################################################
 # 2. Compute Value Function using Iterative Policy Evaluation,
-#    Derive Greedy Policy, and Show Results in Tkinter
+#    Derive Greedy Policy, and Display Results on the Webpage
 ############################################################
 
 @app.route("/solve", methods=["POST"])
 def solve():
     grid_data = session.get("grid_data", None)
     if not grid_data:
+        # If grid not generated, redirect to the form
         return redirect(url_for("index"))
     
     n = grid_data["n"]
@@ -66,28 +67,25 @@ def solve():
     dead = grid_data["dead"]
     obstacles = set(grid_data["obstacles"])
 
-    # Compute value function using iterative policy evaluation
+    # Compute the value function using iterative policy evaluation.
     V = iterative_policy_evaluation(n, start, goal, dead, obstacles)
-    # Derive a greedy policy from the computed value function
+    # Derive a greedy policy from the computed value function.
     policy = derive_policy_from_value(V, n, start, goal, dead, obstacles)
     
-    # Use Tkinter to display the results (this is a blocking call)
-    show_tkinter_result(n, V, policy)
-    
-    # After the Tkinter window is closed, render the same grid page (no redirect)
-    return render_template("index.html", grid=grid_data)
+    # Render the same grid page, but now include the results
+    return render_template("index.html", grid=grid_data, value_matrix=V, policy_matrix=policy)
 
 
 def iterative_policy_evaluation(n, start, goal, dead, obstacles, gamma=0.9, theta=1e-4, step_cost=-0.1):
     """
     Evaluate the value function under a fixed uniform random policy,
-    while not updating the value for obstacle cells (they remain fixed at 0).
+    while not updating the value for obstacle cells (their value remains 0).
 
     For non-terminal and non-obstacle states:
       V(s) = sum_{a in A} [1/|A| * ( R(s, a) + gamma * V(s') ) ]
     Terminal states (goal, dead) are fixed.
     """
-    # Initialize value function V(s)=0 for all states.
+    # Initialize value function: V(s)=0 for all states.
     V = [[0.0 for _ in range(n)] for _ in range(n)]
     actions = {"U": (-1, 0), "D": (1, 0), "L": (0, -1), "R": (0, 1)}
     policy_prob = 1.0 / len(actions)  # Uniform random policy
@@ -96,7 +94,7 @@ def iterative_policy_evaluation(n, start, goal, dead, obstacles, gamma=0.9, thet
         return s == goal or s == dead
 
     def step(s, action_key):
-        # Returns next state and reward given state s and action a
+        # Returns next state and reward for given state and action.
         r, c = s
         if is_terminal(s):
             return s, 0
@@ -105,15 +103,14 @@ def iterative_policy_evaluation(n, start, goal, dead, obstacles, gamma=0.9, thet
         # Check boundaries
         if nr < 0 or nr >= n or nc < 0 or nc >= n:
             return s, step_cost
-        # If moving into an obstacle, agent stays and gets penalty -1
+        # If moving into an obstacle, agent remains and gets penalty -1
         if (nr, nc) in obstacles:
             return s, -1
-        # Check terminal cells
+        # Check for terminal cells
         if (nr, nc) == goal:
             return (nr, nc), 20
         if (nr, nc) == dead:
             return (nr, nc), -20
-        # Normal move cost
         return (nr, nc), step_cost
 
     # Iterative policy evaluation loop
@@ -123,16 +120,17 @@ def iterative_policy_evaluation(n, start, goal, dead, obstacles, gamma=0.9, thet
         for r in range(n):
             for c in range(n):
                 s = (r, c)
-                # If the state is an obstacle, do not update its value.
+                # Skip obstacles: their value remains 0.
                 if s in obstacles:
                     newV[r][c] = 0
                     continue
+                # Terminal states have fixed values.
                 if is_terminal(s):
                     newV[r][c] = 20.0 if s == goal else -20.0
                     continue
 
                 v_sum = 0.0
-                # Sum over all possible actions (uniform policy)
+                # Sum over all actions (uniform probability).
                 for a in actions:
                     next_state, reward = step(s, a)
                     ns_r, ns_c = next_state
@@ -176,7 +174,7 @@ def derive_policy_from_value(V, n, start, goal, dead, obstacles, gamma=0.9, step
     for r in range(n):
         for c in range(n):
             s = (r, c)
-            # For obstacles, set the policy as '#' and skip evaluation.
+            # For obstacles, mark policy as "#" and skip evaluation.
             if s in obstacles:
                 policy[r][c] = "#"
                 continue
@@ -206,43 +204,6 @@ def derive_policy_from_value(V, n, start, goal, dead, obstacles, gamma=0.9, step
                     policy[r][c] = "."
     return policy
 
-
-############################################################
-# 3. Tkinter: Display Value Function & Policy
-############################################################
-
-def show_tkinter_result(n, value_matrix, policy_matrix):
-    root = tk.Tk()
-    root.title("Value Function and Derived Policy")
-
-    # Frame for Value Matrix
-    frame_value = tk.Frame(root, padx=10, pady=10)
-    frame_value.pack(side=tk.LEFT, anchor=tk.N)
-    # Frame for Policy Matrix
-    frame_policy = tk.Frame(root, padx=10, pady=10)
-    frame_policy.pack(side=tk.LEFT, anchor=tk.N)
-
-    # Title for Value Matrix
-    tk.Label(frame_value, text="Value Matrix", font=("Arial", 14, "bold"))\
-        .grid(row=0, column=0, columnspan=n)
-    # Display Value Matrix in a grid layout
-    for r in range(n):
-        for c in range(n):
-            val = value_matrix[r][c]
-            tk.Label(frame_value, text=f"{val:.2f}", width=6, borderwidth=1, relief="solid")\
-                .grid(row=r+1, column=c, padx=1, pady=1)
-
-    # Title for Policy Matrix
-    tk.Label(frame_policy, text="Policy Matrix", font=("Arial", 14, "bold"))\
-        .grid(row=0, column=0, columnspan=n)
-    # Display Policy Matrix in a grid layout
-    for r in range(n):
-        for c in range(n):
-            pol = policy_matrix[r][c]
-            tk.Label(frame_policy, text=f"{pol}", width=3, borderwidth=1, relief="solid")\
-                .grid(row=r+1, column=c, padx=1, pady=1)
-
-    root.mainloop()
 
 if __name__ == "__main__":
     app.run(debug=True)
