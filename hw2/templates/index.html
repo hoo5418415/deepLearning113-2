@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Grid World with Value Iteration</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    .grid-container {
+      display: grid;
+      grid-gap: 3px;
+      margin-top: 10px;
+    }
+    .cell {
+      width: 60px;
+      height: 60px;
+      border: 1px solid #444;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    /* 各狀態顏色 */
+    .empty { background-color: #fff; color: #000; }
+    .start { background-color: green; color: #fff; }
+    .goal  { background-color: red; color: #fff; }
+    .dead  { background-color: blue; color: #fff; }
+    .obstacle { background-color: gray; color: #fff; }
+    .panel { margin-bottom: 10px; }
+    .error { color: red; font-weight: bold; }
+    /* 用來同時呈現政策與數值 */
+    .policy-text { font-size: 18px; line-height: 1; }
+    .value-text { font-size: 14px; line-height: 1; }
+  </style>
+</head>
+<body>
+  <h1>Grid World with Value Iteration</h1>
+  
+  <!-- 1. 輸入 n 與生成按鈕 -->
+  <div class="panel">
+    <label for="nInput">Grid Size (3~7): </label>
+    <input type="number" id="nInput" min="3" max="7" value="5">
+    <button id="btnGenerate">Generate Grid</button>
+  </div>
+
+  <!-- 2. 模式選擇：start, goal, dead, obstacle -->
+  <div class="panel">
+    <label><input type="radio" name="mode" value="start" checked> 設為起點</label>
+    <label><input type="radio" name="mode" value="goal"> 設為目標</label>
+    <label><input type="radio" name="mode" value="dead"> 設為死格子</label>
+    <label><input type="radio" name="mode" value="obstacle"> 放置障礙</label>
+  </div>
+
+  <!-- 3. 顯示錯誤訊息 -->
+  <div id="errorMsg" class="error"></div>
+
+  <!-- 4. Grid 容器 -->
+  <div id="gridContainer" class="grid-container"></div>
+
+  <!-- 5. 執行 Value Iteration -->
+  <div class="panel">
+    <button id="btnValueIteration">Run Value Iteration</button>
+  </div>
+
+  <script>
+    const gridContainer = document.getElementById('gridContainer');
+    const errorMsg = document.getElementById('errorMsg');
+    const nInput = document.getElementById('nInput');
+    const btnGenerate = document.getElementById('btnGenerate');
+    const btnValueIteration = document.getElementById('btnValueIteration');
+
+    let currentGrid = [];
+    let nSize = 5;
+
+    // 生成網格：呼叫 /generate API
+    btnGenerate.addEventListener('click', () => {
+      const nVal = parseInt(nInput.value);
+      if (nVal < 3 || nVal > 7) {
+        errorMsg.textContent = "n 必須在 3~7 之間";
+        return;
+      }
+      errorMsg.textContent = "";
+      nSize = nVal;
+      fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n: nVal })
+      })
+      .then(res => {
+        if (!res.ok) return res.json().then(data => { throw data; });
+        return res.json();
+      })
+      .then(data => {
+        currentGrid = data.grid;
+        renderGrid(currentGrid);
+      })
+      .catch(err => {
+        errorMsg.textContent = err.error || "發生未知錯誤";
+      });
+    });
+
+    // 渲染網格
+    function renderGrid(grid, policy = null, values = null) {
+      gridContainer.innerHTML = "";
+      gridContainer.style.gridTemplateColumns = `repeat(${nSize}, 60px)`;
+      gridContainer.style.gridTemplateRows = `repeat(${nSize}, 60px)`;
+      for (let r = 0; r < nSize; r++) {
+        for (let c = 0; c < nSize; c++) {
+          const cell = document.createElement('div');
+          cell.classList.add('cell');
+          cell.classList.add(grid[r][c]); // empty, start, goal, dead, obstacle
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          if (policy && values) {
+            const pDiv = document.createElement('div');
+            pDiv.classList.add('policy-text');
+            pDiv.textContent = policy[r][c];
+            const vDiv = document.createElement('div');
+            vDiv.classList.add('value-text');
+            vDiv.textContent = values[r][c].toFixed(2);
+            cell.innerHTML = "";
+            cell.appendChild(pDiv);
+            cell.appendChild(vDiv);
+          }
+          gridContainer.appendChild(cell);
+        }
+      }
+    }
+
+    // 格子點擊更新：呼叫 /update_cell
+    gridContainer.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('cell')) return;
+      const row = parseInt(e.target.dataset.row);
+      const col = parseInt(e.target.dataset.col);
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      fetch('/update_cell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ row, col, mode })
+      })
+      .then(res => {
+        if (!res.ok) return res.json().then(data => { throw data; });
+        return res.json();
+      })
+      .then(data => {
+        currentGrid = data.grid;
+        renderGrid(currentGrid);
+        errorMsg.textContent = "";
+      })
+      .catch(err => {
+        errorMsg.textContent = err.error || "發生未知錯誤";
+      });
+    });
+
+    // 執行 Value Iteration：呼叫 /value_iteration
+    btnValueIteration.addEventListener('click', () => {
+      fetch('/value_iteration', { method: 'POST' })
+      .then(res => {
+        if (!res.ok) return res.json().then(data => { throw data; });
+        return res.json();
+      })
+      .then(data => {
+        renderGrid(currentGrid, data.policy, data.values);
+        errorMsg.textContent = "";
+      })
+      .catch(err => {
+        errorMsg.textContent = err.error || "發生未知錯誤";
+      });
+    });
+  </script>
+</body>
+</html>
