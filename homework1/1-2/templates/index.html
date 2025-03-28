@@ -67,7 +67,8 @@
       {% for i in range(grid.n) %}
       <tr>
         {% for j in range(grid.n) %}
-          <td style="background-color: {% if (i, j) == grid.start %}green{% elif (i, j) == grid.goal %}red{% elif (i, j) == grid.dead %}blue{% elif (i, j) in grid.obstacles %}gray{% else %}white{% endif %}">
+          {% set cell = (i, j) %}
+          <td style="background-color: {% if cell == grid.start %}green{% elif cell == grid.goal %}red{% elif cell == grid.dead %}blue{% elif cell in grid.obstacles %}gray{% else %}white{% endif %};">
             {{ value_matrix[i][j]|round(2) }}
           </td>
         {% endfor %}
@@ -75,12 +76,13 @@
       {% endfor %}
     </table>
     
-    <h3>Policy Matrix</h3>
+    <h3>Policy Matrix (Random, Reaching Goal)</h3>
     <table>
       {% for i in range(grid.n) %}
       <tr>
         {% for j in range(grid.n) %}
-          <td style="background-color: {% if (i, j) == grid.start %}green{% elif (i, j) == grid.goal %}red{% elif (i, j) == grid.dead %}blue{% elif (i, j) in grid.obstacles %}gray{% else %}white{% endif %}">
+          {% set cell = (i, j) %}
+          <td style="background-color: {% if cell == grid.start %}green{% elif cell == grid.goal %}red{% elif cell == grid.dead %}blue{% elif cell in grid.obstacles %}gray{% else %}white{% endif %};">
             {{ policy_matrix[i][j] }}
           </td>
         {% endfor %}
